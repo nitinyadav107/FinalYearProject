@@ -26,6 +26,15 @@ def load_preview(csv_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     return raw_df, normalized_df
 
 
+def model_artifacts_ready() -> tuple[bool, list[str]]:
+    required_files = [
+        Path("models/gnn_ids.pt"),
+        Path("models/scaler.joblib"),
+    ]
+    missing = [str(path) for path in required_files if not path.exists()]
+    return len(missing) == 0, missing
+
+
 st.title("GNN-Based Network Intrusion Detection")
 st.caption("Interactive demo dashboard for final-year project presentation")
 
@@ -51,6 +60,11 @@ with left:
 with right:
     st.subheader("Saved Training Metrics")
     metrics = read_json("reports/metrics.json")
+    ready, missing_artifacts = model_artifacts_ready()
+    if ready:
+        st.success("Deployment model artifacts are available")
+    else:
+        st.warning(f"Missing model artifacts: {', '.join(missing_artifacts)}")
     if metrics:
         metric_cols = st.columns(4)
         metric_cols[0].metric("Accuracy", f"{metrics.get('test_accuracy', 0):.3f}")

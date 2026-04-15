@@ -11,6 +11,9 @@ data/*.csv
 models/*.pt
 models/*.joblib
 models/*.json
+!models/gnn_ids.pt
+!models/scaler.joblib
+!models/metadata.json
 reports/*.png
 reports/*.csv
 reports/*.txt
