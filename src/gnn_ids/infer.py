@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import joblib
+import pandas as pd
+import torch
+
+from .data import build_inference_graph, load_flows
+from .models import GNNClassifier
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run inference with a trained GNN IDS model.")
+    parser.add_argument("--input", required=True, help="Path to input CSV containing network flows.")
+    parser.add_argument("--checkpoint", default="models/gnn_ids.pt")
+    parser.add_argument("--scaler-path", default="models/scaler.joblib")
+    parser.add_argument("--top-k", type=int, default=10)
+    parser.add_argument("--output", default="reports/inference_results.csv")
+    return parser.parse_args()
+
+
+def run_inference(input_path: str, checkpoint: str, scaler_path: str) -> pd.DataFrame:
+    payload = torch.load(checkpoint, map_location="cpu")
+    scaler = joblib.load(scaler_path)
+
+    df = load_flows(input_path)
+    graph, node_mapping, _, _ = build_inference_graph(df, scaler=scaler)
+
+    model = GNNClassifier(
+        input_dim=payload["input_dim"],
+        hidden_dim=payload["hidden_dim"],
+        model_name=payload["model_name"],
+    )
+    model.load_state_dict(payload["model_state_dict"])
+    model.eval()
+
+    with torch.no_grad():
+        logits = model(graph.x, graph.edge_index)
+        scores = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
+
+    return pd.DataFrame(
+        {
+            "node": list(node_mapping.keys()),
+            "suspicion_score": scores,
+            "predicted_label": (scores >= 0.5).astype(int),
+        }
+    ).sort_values("suspicion_score", ascending=False)
+
+
+def main() -> None:
+    args = parse_args()
+    results = run_inference(args.input, args.checkpoint, args.scaler_path)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(output_path, index=False)
+    print(results.head(args.top_k).to_string(index=False))
+    print(f"\nSaved full inference output to {output_path}")
+
+
+if __name__ == "__main__":
+    main()

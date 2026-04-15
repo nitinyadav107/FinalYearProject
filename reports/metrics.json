@@ -1,0 +1,12 @@
+{
+  "dataset": "synthetic",
+  "model": "graphsage",
+  "epochs": 5,
+  "test_accuracy": 1.0,
+  "test_precision": 1.0,
+  "test_recall": 1.0,
+  "test_f1": 1.0,
+  "roc_auc": null,
+  "num_nodes": 36,
+  "num_edges": 1468
+}
