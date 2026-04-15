@@ -138,11 +138,17 @@ with tab_infer:
     inference_path = st.text_input("Inference CSV path", value="data/synthetic_flows.csv")
     checkpoint_path = st.text_input("Checkpoint path", value="models/gnn_ids.pt")
     scaler_path = st.text_input("Scaler path", value="models/scaler.joblib")
+    threshold = st.slider("Suspicion threshold", min_value=0.50, max_value=0.90, value=0.75, step=0.05)
 
     if st.button("Run inference"):
         try:
-            results = run_inference(inference_path, checkpoint_path, scaler_path)
+            results = run_inference(inference_path, checkpoint_path, scaler_path, threshold=threshold)
             st.session_state["inference_results_df"] = results
+            source_df = normalize_flows(pd.read_csv(inference_path))
+            source_nodes = set(source_df["src_ip"].astype(str).tolist())
+            st.session_state["suspicious_source_nodes_df"] = results[
+                results["node"].isin(source_nodes) & (results["predicted_label"] == 1)
+            ].copy()
             st.success("Inference completed")
             st.dataframe(results.head(25), use_container_width=True)
             st.bar_chart(results.head(10).set_index("node")["suspicion_score"])
@@ -157,6 +163,20 @@ with tab_infer:
             file_name="inference_results.csv",
             mime="text/csv",
         )
+
+    suspicious_source_nodes_df = st.session_state.get("suspicious_source_nodes_df")
+    if isinstance(suspicious_source_nodes_df, pd.DataFrame):
+        st.subheader("Suspicious Source IPs")
+        if suspicious_source_nodes_df.empty:
+            st.info("No suspicious source IPs detected in this run.")
+        else:
+            st.dataframe(suspicious_source_nodes_df[["node", "suspicion_score"]], use_container_width=True)
+            st.download_button(
+                label="Download suspicious source IPs only",
+                data=dataframe_to_csv_bytes(suspicious_source_nodes_df),
+                file_name="suspicious_source_nodes.csv",
+                mime="text/csv",
+            )
 
 st.divider()
 

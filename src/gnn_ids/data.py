@@ -50,23 +50,30 @@ class GraphArtifacts:
 def generate_synthetic_flows(output_csv: str | Path, n_flows: int = 1200, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     normal_nodes = [f"10.0.0.{i}" for i in range(1, 31)]
-    suspicious_nodes = [f"172.16.0.{i}" for i in range(1, 7)]
+    server_nodes = [f"10.0.1.{i}" for i in range(1, 5)]
     rows = []
 
+    attack_ratio = 0.12
+    attacker_count = max(3, int(round(len(normal_nodes) * 0.2)))
+    attacker_sources = set(rng.choice(normal_nodes, size=attacker_count, replace=False).tolist())
+
     for _ in range(n_flows):
-        is_attack = int(rng.random() < 0.18)
+        is_attack = int(rng.random() < attack_ratio)
         if is_attack:
-            src = rng.choice(suspicious_nodes)
-            dst = rng.choice(normal_nodes)
-            bytes_sent = max(2000, rng.normal(12000, 3500))
-            packets = max(20, rng.normal(250, 60))
-            duration = max(0.1, rng.normal(1.5, 0.7))
+            src = rng.choice(sorted(attacker_sources))
+            dst = rng.choice(normal_nodes + server_nodes)
+            bytes_sent = max(2500, rng.normal(15000, 4200))
+            packets = max(24, rng.normal(280, 70))
+            duration = max(0.15, rng.normal(1.8, 0.8))
         else:
-            src = rng.choice(normal_nodes)
-            dst = rng.choice(normal_nodes)
-            bytes_sent = max(100, rng.normal(1800, 600))
-            packets = max(3, rng.normal(28, 8))
-            duration = max(0.05, rng.normal(0.35, 0.12))
+            normal_pool = [node for node in normal_nodes + server_nodes if node not in attacker_sources]
+            if not normal_pool:
+                normal_pool = normal_nodes + server_nodes
+            src = rng.choice(normal_pool)
+            dst = rng.choice(normal_pool)
+            bytes_sent = max(120, rng.normal(1400, 450))
+            packets = max(2, rng.normal(20, 6))
+            duration = max(0.03, rng.normal(0.28, 0.09))
 
         rows.append(
             {
@@ -164,9 +171,10 @@ def _build_node_features(df: pd.DataFrame, feature_columns: Iterable[str] | None
 
 
 def _build_node_labels(df: pd.DataFrame, all_nodes: list[str]) -> np.ndarray:
+    # Host-level suspicious labeling: only nodes that appear as malicious sources
+    # are marked positive. This keeps destination-only hosts from being mislabeled.
     src_labels = df.groupby("src_ip")["label"].max()
-    dst_labels = df.groupby("dst_ip")["label"].max()
-    labels = [int(max(src_labels.get(node, 0), dst_labels.get(node, 0))) for node in all_nodes]
+    labels = [int(src_labels.get(node, 0)) for node in all_nodes]
     return np.asarray(labels, dtype=np.int64)
 
 
