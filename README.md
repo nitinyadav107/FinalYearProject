@@ -1,19 +1,83 @@
 # GNN-Based Network Intrusion Detection System
 
-This is a complete final-year project implementation for detecting malicious network behavior using Graph Neural Networks (GNNs). It supports both a quick synthetic demo and real CSV traffic datasets such as CICIDS-style exports after column mapping.
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c?logo=pytorch&logoColor=white)
+![PyG](https://img.shields.io/badge/PyTorch_Geometric-GNN-orange)
+![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-ff4b4b?logo=streamlit&logoColor=white)
+![Status](https://img.shields.io/badge/Project-Completed-1f7a4d)
 
-## Highlights
+An end-to-end final year project that detects suspicious network behavior by converting traffic flows into graphs and training Graph Neural Networks to identify malicious hosts automatically.
 
-- End-to-end graph learning pipeline for intrusion detection
-- Flexible CSV preprocessing with automatic column mapping
-- Synthetic dataset generator for instant demonstrations
-- GNN models: `GCN`, `GraphSAGE`, and `GAT`
-- Training pipeline with checkpointing, metrics, plots, and exported reports
-- Inference pipeline with suspicious node ranking
-- Streamlit dashboard for academic demos and presentations
-- Mini project report template with objectives, workflow, and future scope
+## Problem It Solves
 
-## Project Structure
+Modern networks contain many interconnected devices, and attacks like DDoS, reconnaissance, botnet coordination, and malicious lateral movement often appear as relationship patterns, not just suspicious single rows of data.
+
+Traditional machine learning models usually inspect traffic records independently. This project solves that limitation by modeling the network as a graph:
+
+- Nodes = IP addresses or hosts
+- Edges = communication between hosts
+- Output = suspicious node prediction
+
+Because a Graph Neural Network learns from both host features and neighboring behavior, it is better suited for connected attack patterns than flat-row classifiers.
+
+## Project Overview
+
+This system:
+
+- loads raw traffic CSV data
+- normalizes columns such as source IP, destination IP, bytes, packets, duration, and label
+- builds a graph from host communications
+- aggregates node-level traffic behavior
+- trains `GCN`, `GraphSAGE`, or `GAT`
+- evaluates model performance with metrics and plots
+- ranks suspicious hosts during inference
+- provides a Streamlit dashboard for visual demo
+
+## Tech Stack
+
+- `Python` for the full implementation
+- `PyTorch` for deep learning
+- `PyTorch Geometric` for graph neural network layers and graph data handling
+- `Pandas` for CSV processing and feature preparation
+- `scikit-learn` for scaling, train/test splits, and metrics
+- `Matplotlib` and `Seaborn` for evaluation visuals
+- `Streamlit` for the interactive dashboard
+
+## Dataset Used
+
+The project supports:
+
+- synthetic dataset generation for guaranteed demo and testing
+- real CSV traffic datasets such as CICIDS-style exports after column mapping
+
+Expected logical fields:
+
+- `src_ip`
+- `dst_ip`
+- `bytes`
+- `packets`
+- `duration`
+- `label`
+
+The preprocessing layer auto-detects common alternate column names such as `Source IP`, `Destination IP`, `Flow Duration`, and `Label`. Text labels like `BENIGN` are converted to `0`, while attack labels are converted to `1`.
+
+## Workflow
+
+1. Collect or load network traffic CSV data.
+2. Normalize the dataset schema.
+3. Convert traffic into a graph.
+4. Generate node features from incoming and outgoing activity.
+5. Train a GNN model for node classification.
+6. Evaluate with accuracy, precision, recall, F1-score, confusion matrix, and ROC curve.
+7. Run inference to rank suspicious nodes.
+
+## Models Used
+
+- `GCN` for baseline graph convolution
+- `GraphSAGE` for scalable neighborhood aggregation
+- `GAT` for attention-based neighborhood weighting
+
+## Repository Structure
 
 ```text
 finalyearproject/
@@ -32,17 +96,6 @@ finalyearproject/
 `-- README.md
 ```
 
-## Tech Stack
-
-- Python
-- PyTorch
-- PyTorch Geometric
-- Pandas
-- Scikit-learn
-- Matplotlib
-- Seaborn
-- Streamlit
-
 ## Installation
 
 ```bash
@@ -51,106 +104,82 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Dataset Format
+## Run The Project
 
-The pipeline ultimately needs these logical fields:
-
-- `src_ip`
-- `dst_ip`
-- `bytes`
-- `packets`
-- `duration`
-- `label`
-
-If your CSV uses different names, the project tries to auto-detect them. Typical examples:
-
-- `Source IP` -> `src_ip`
-- `Destination IP` -> `dst_ip`
-- `Flow Duration` -> `duration`
-- `Total Fwd Packets` or `Packet Count` -> `packets`
-- `Total Length of Fwd Packets` or `Bytes` -> `bytes`
-- `Label` -> `label`
-
-`label` can be numeric (`0` / `1`) or text (`BENIGN`, `DoS`, `PortScan`, etc.). Benign-like labels are mapped to `0`; everything else is mapped to `1`.
-
-## Quick Start
-
-### 1. Train on Synthetic Data
+Train on synthetic data:
 
 ```bash
 python -m src.gnn_ids.train --dataset synthetic --epochs 20
 ```
 
-This creates:
-
-- `data/synthetic_flows.csv`
-- `models/gnn_ids.pt`
-- `models/scaler.joblib`
-- `models/metadata.json`
-- `reports/metrics.json`
-- `reports/classification_report.txt`
-- `reports/node_predictions.csv`
-- `reports/training_history.csv`
-- plots in `reports/`
-
-### 2. Run Inference
+Run inference:
 
 ```bash
 python -m src.gnn_ids.infer --input data/synthetic_flows.csv --checkpoint models/gnn_ids.pt
 ```
 
-### 3. Launch Dashboard
+Launch the dashboard:
 
 ```bash
 streamlit run app.py
 ```
 
-## Training With a Real CSV
-
-Place your dataset file in `data/`, then run:
+Train with a real CSV:
 
 ```bash
 python -m src.gnn_ids.train --dataset csv --csv-path data/your_dataset.csv --model gat --epochs 30
 ```
 
-## Workflow
+## Dashboard and Output Screenshots
 
-1. Load raw network traffic records from CSV.
-2. Normalize column names and labels.
-3. Convert communications into a graph.
-4. Aggregate node-level behavior features from incoming and outgoing traffic.
-5. Train a GNN on node classification.
-6. Evaluate using accuracy, precision, recall, F1-score, confusion matrix, and ROC-AUC.
-7. Rank suspicious nodes for analyst review.
+### Training Curves
 
-## Demo Ideas for Viva or Presentation
+![Training Curves](reports/training_curves.png)
 
-- Show the generated communication graph statistics.
-- Compare `GCN`, `GraphSAGE`, and `GAT`.
-- Open the Streamlit dashboard and upload a CSV.
-- Explain how GNN captures neighborhood behavior better than normal ML on flat rows.
-- Show suspicious nodes with confidence scores from inference output.
+### Confusion Matrix
 
-## Academic Sections You Can Reuse
+![Confusion Matrix](reports/confusion_matrix.png)
 
-### Objective
+## Output Files
 
-To design an intelligent intrusion detection system that models network traffic as a graph and uses Graph Neural Networks to identify anomalous or malicious communication patterns.
+After training, the project generates:
 
-### Problem Statement
+- `models/gnn_ids.pt`
+- `models/scaler.joblib`
+- `models/metadata.json`
+- `reports/metrics.json`
+- `reports/training_history.csv`
+- `reports/node_predictions.csv`
+- `reports/inference_results.csv`
+- `reports/confusion_matrix.png`
+- `reports/training_curves.png`
+- `reports/roc_curve.png` when both classes are present in evaluation
+- `reports/classification_report.txt`
 
-Traditional intrusion detection systems often treat network flows independently and may miss structural attack behavior spread across multiple hosts. This project addresses that limitation by representing communications as graphs and learning relationships between connected entities.
+## Academic Use
 
-### Future Scope
+This repository is suitable for:
 
-- Temporal graph modeling for time-aware detection
-- Edge classification for malicious flow detection
-- Real-time packet capture integration
-- Explainable AI for security analysts
-- Deployment with SIEM/SOC pipelines
+- final year project submission
+- viva presentation and demonstration
+- graph-based intrusion detection research prototype
+- cybersecurity and GNN learning projects
+
+The repo also includes:
+
+- project report content in `reports/PROJECT_REPORT.md`
+- a generated presentation in `reports/GNN_IDS_Final_Presentation.pptx`
+
+## Future Scope
+
+- real-time packet capture integration
+- temporal GNNs for time-aware attack detection
+- explainable AI for analyst-friendly outputs
+- edge classification for malicious flow detection
+- SOC/SIEM integration for operational deployment
 
 ## Notes
 
-- `torch-geometric` may require a compatible local PyTorch installation.
-- Synthetic mode is useful when you need a guaranteed demo without downloading public datasets.
-- For best academic results, train and compare all three models, then include their metrics table in your report.
+- `torch-geometric` should match your local PyTorch environment
+- synthetic mode is useful for demo when a public dataset is not locally available
+- the tested run in this repo generated evaluation outputs successfully

@@ -14,6 +14,9 @@ models/*.json
 reports/*.png
 reports/*.csv
 reports/*.txt
+!reports/training_curves.png
+!reports/confusion_matrix.png
+!reports/roc_curve.png
 
 *.log
 Thumbs.db
