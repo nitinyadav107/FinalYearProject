@@ -35,6 +35,10 @@ def model_artifacts_ready() -> tuple[bool, list[str]]:
     return len(missing) == 0, missing
 
 
+def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
+    return df.to_csv(index=False).encode("utf-8")
+
+
 st.title("GNN-Based Network Intrusion Detection")
 st.caption("Interactive demo dashboard for final-year project presentation")
 
@@ -85,8 +89,18 @@ with tab_demo:
     seed = st.number_input("Random seed", min_value=1, max_value=9999, value=42)
     if st.button("Generate synthetic CSV"):
         df = generate_synthetic_flows("data/synthetic_flows.csv", n_flows=flow_count, seed=int(seed))
+        st.session_state["synthetic_demo_df"] = df
         st.success(f"Generated {len(df)} flows at data/synthetic_flows.csv")
         st.dataframe(df.head(15), use_container_width=True)
+
+    synthetic_demo_df = st.session_state.get("synthetic_demo_df")
+    if isinstance(synthetic_demo_df, pd.DataFrame) and not synthetic_demo_df.empty:
+        st.download_button(
+            label="Download complete synthetic CSV",
+            data=dataframe_to_csv_bytes(synthetic_demo_df),
+            file_name="synthetic_flows.csv",
+            mime="text/csv",
+        )
 
 with tab_dataset:
     st.subheader("Preview Dataset")
@@ -128,11 +142,21 @@ with tab_infer:
     if st.button("Run inference"):
         try:
             results = run_inference(inference_path, checkpoint_path, scaler_path)
+            st.session_state["inference_results_df"] = results
             st.success("Inference completed")
             st.dataframe(results.head(25), use_container_width=True)
             st.bar_chart(results.head(10).set_index("node")["suspicion_score"])
         except Exception as exc:
             st.error(str(exc))
+
+    inference_results_df = st.session_state.get("inference_results_df")
+    if isinstance(inference_results_df, pd.DataFrame) and not inference_results_df.empty:
+        st.download_button(
+            label="Download complete inference CSV",
+            data=dataframe_to_csv_bytes(inference_results_df),
+            file_name="inference_results.csv",
+            mime="text/csv",
+        )
 
 st.divider()
 
