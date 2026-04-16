@@ -6,7 +6,7 @@
   "test_precision": 1.0,
   "test_recall": 1.0,
   "test_f1": 1.0,
-  "roc_auc": null,
-  "num_nodes": 36,
-  "num_edges": 1468
+  "roc_auc": 1.0,
+  "num_nodes": 34,
+  "num_edges": 1364
 }
