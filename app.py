@@ -104,7 +104,12 @@ with tab_demo:
 
 with tab_dataset:
     st.subheader("Preview Dataset")
-    input_choice = st.radio("Choose input source", ["Existing file", "Upload CSV"], horizontal=True)
+    input_choice = st.radio(
+        "Choose input source",
+        ["Existing file", "Upload CSV"],
+        horizontal=True,
+        key="preview_input_choice",
+    )
 
     csv_path: Path | None = None
     if input_choice == "Existing file":
@@ -135,12 +140,37 @@ with tab_dataset:
 
 with tab_infer:
     st.subheader("Run Saved Model on a CSV")
-    inference_path = st.text_input("Inference CSV path", value="data/synthetic_flows.csv")
+    infer_input_choice = st.radio(
+        "Choose input source",
+        ["Existing file", "Upload CSV"],
+        horizontal=True,
+        key="infer_input_choice",
+    )
+
+    inference_path = None
+    if infer_input_choice == "Existing file":
+        inference_path = st.text_input("Inference CSV path", value="data/synthetic_flows.csv")
+    else:
+        uploaded_infer = st.file_uploader("Upload a traffic CSV for inference", type=["csv"], key="infer_upload")
+        if uploaded_infer is not None:
+            saved_path = Path("data/uploaded_inference.csv")
+            saved_path.parent.mkdir(parents=True, exist_ok=True)
+            saved_path.write_bytes(uploaded_infer.getvalue())
+            inference_path = str(saved_path)
+            st.caption(f"Using uploaded file: {saved_path}")
+        else:
+            st.info("Upload a CSV to run inference.")
+
     checkpoint_path = st.text_input("Checkpoint path", value="models/gnn_ids.pt")
     scaler_path = st.text_input("Scaler path", value="models/scaler.joblib")
     threshold = st.slider("Suspicion threshold", min_value=0.50, max_value=0.90, value=0.75, step=0.05)
 
-    if st.button("Run inference"):
+    ready, missing_artifacts = model_artifacts_ready()
+    if not ready:
+        st.warning(f"Missing model artifacts: {', '.join(missing_artifacts)}")
+
+    can_run = ready and bool(inference_path)
+    if st.button("Run inference", disabled=not can_run):
         try:
             results = run_inference(inference_path, checkpoint_path, scaler_path, threshold=threshold)
             st.session_state["inference_results_df"] = results
