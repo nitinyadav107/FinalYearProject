@@ -7,7 +7,7 @@ import joblib
 import pandas as pd
 import torch
 
-from .data import build_inference_graph, load_flows
+from .data import _build_node_labels, build_inference_graph, load_flows
 from .models import GNNClassifier
 
 
@@ -29,7 +29,7 @@ def run_inference(input_path: str, checkpoint: str, scaler_path: str, threshold:
     scaler = joblib.load(scaler_path)
 
     df = load_flows(input_path)
-    graph, node_mapping, _, _ = build_inference_graph(df, scaler=scaler)
+    graph, node_mapping, _, normalized_df = build_inference_graph(df, scaler=scaler)
 
     model = GNNClassifier(
         input_dim=payload["input_dim"],
@@ -43,11 +43,15 @@ def run_inference(input_path: str, checkpoint: str, scaler_path: str, threshold:
         logits = model(graph.x, graph.edge_index)
         scores = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
 
+    all_nodes = list(node_mapping.keys())
+    true_labels = _build_node_labels(normalized_df, all_nodes)
+
     return pd.DataFrame(
         {
-            "node": list(node_mapping.keys()),
+            "node": all_nodes,
             "suspicion_score": scores,
             "predicted_label": (scores >= threshold).astype(int),
+            "true_label": true_labels,
         }
     ).sort_values("suspicion_score", ascending=False)
 

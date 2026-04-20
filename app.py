@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 from src.gnn_ids.data import generate_synthetic_flows, normalize_flows
 from src.gnn_ids.infer import run_inference
@@ -91,7 +92,7 @@ with tab_demo:
         df = generate_synthetic_flows("data/synthetic_flows.csv", n_flows=flow_count, seed=int(seed))
         st.session_state["synthetic_demo_df"] = df
         st.success(f"Generated {len(df)} flows at data/synthetic_flows.csv")
-        st.dataframe(df.head(15), use_container_width=True)
+        st.dataframe(df, use_container_width=True)
 
     synthetic_demo_df = st.session_state.get("synthetic_demo_df")
     if isinstance(synthetic_demo_df, pd.DataFrame) and not synthetic_demo_df.empty:
@@ -125,6 +126,7 @@ with tab_dataset:
     if csv_path and csv_path.exists():
         try:
             raw_df, normalized_df = load_preview(csv_path)
+
             st.write("Raw columns:", list(raw_df.columns))
             summary_cols = st.columns(4)
             summary_cols[0].metric("Flows", len(normalized_df))
@@ -132,7 +134,7 @@ with tab_dataset:
             summary_cols[2].metric("Unique Destinations", normalized_df["dst_ip"].nunique())
             summary_cols[3].metric("Attack Ratio", f"{normalized_df['label'].mean():.2%}")
             st.write("Normalized preview")
-            st.dataframe(normalized_df.head(20), use_container_width=True)
+            st.dataframe(normalized_df, use_container_width=True)
         except Exception as exc:
             st.error(str(exc))
     else:
@@ -180,8 +182,55 @@ with tab_infer:
                 results["node"].isin(source_nodes) & (results["predicted_label"] == 1)
             ].copy()
             st.success("Inference completed")
-            st.dataframe(results.head(25), use_container_width=True)
-            st.bar_chart(results.head(10).set_index("node")["suspicion_score"])
+
+            if "true_label" in results.columns and "predicted_label" in results.columns:
+                unique_labels = results["true_label"].nunique()
+                if unique_labels > 1 or (unique_labels == 1 and results["true_label"].iloc[0] == 1):
+                    acc = accuracy_score(results["true_label"], results["predicted_label"])
+                    prec = precision_score(results["true_label"], results["predicted_label"], zero_division=0)
+                    rec = recall_score(results["true_label"], results["predicted_label"], zero_division=0)
+                    f1 = f1_score(results["true_label"], results["predicted_label"], zero_division=0)
+
+                    st.subheader("Node-Level Classification Performance")
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Accuracy", f"{acc:.3f}")
+                    m2.metric("Precision", f"{prec:.3f}")
+                    m3.metric("Recall", f"{rec:.3f}")
+                    m4.metric("F1", f"{f1:.3f}")
+                else:
+                    st.info("Dataset only contains benign instances (or no labels). Node Metrics (Precision/Recall) are not strictly applicable.")
+
+            if "label" in source_df.columns:
+                unique_flow_labels = source_df["label"].nunique()
+                if unique_flow_labels > 1 or (unique_flow_labels == 1 and source_df["label"].iloc[0] == 1):
+                    pred_map = dict(zip(results["node"], results["predicted_label"]))
+                    flow_predicted = source_df["src_ip"].map(pred_map).fillna(0).astype(int)
+                    flow_true = source_df["label"].astype(int)
+
+                    acc_flow = accuracy_score(flow_true, flow_predicted)
+                    prec_flow = precision_score(flow_true, flow_predicted, zero_division=0)
+                    rec_flow = recall_score(flow_true, flow_predicted, zero_division=0)
+                    f1_flow = f1_score(flow_true, flow_predicted, zero_division=0)
+
+                    st.subheader("Real Traffic (Flow-Level) Performance")
+                    fm1, fm2, fm3, fm4 = st.columns(4)
+                    fm1.metric("Accuracy", f"{acc_flow:.3f}")
+                    fm2.metric("Precision", f"{prec_flow:.3f}")
+                    fm3.metric("Recall", f"{rec_flow:.3f}")
+                    fm4.metric("F1 Score", f"{f1_flow:.3f}")
+                else:
+                    st.info("Dataset only contains benign flows. Flow Metrics are not strictly applicable.")
+
+            pred_mapping = dict(zip(results["node"], results["predicted_label"]))
+            presentation_df = source_df.copy()
+            presentation_df["Status"] = presentation_df["src_ip"].map(pred_mapping).fillna(0).map({0: "✅ Normal", 1: "🛑 Suspicious"})
+
+            st.subheader("Real Predicted Traffic Flows (Raw Data view)")
+            st.dataframe(presentation_df, use_container_width=True)
+
+            st.subheader("Node Intelligence Results")
+            st.dataframe(results, use_container_width=True)
+            st.bar_chart(results.set_index("node")["suspicion_score"])
         except Exception as exc:
             st.error(str(exc))
 
